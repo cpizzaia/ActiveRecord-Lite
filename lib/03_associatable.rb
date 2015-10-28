@@ -27,46 +27,49 @@ class BelongsToOptions < AssocOptions
 
     @foreign_key = "#{name.downcase}_id".to_sym if @foreign_key.nil?
     @primary_key = :id if @primary_key.nil?
-    @class_name = name.camelcase.singularize if @class_name.nil?
+    @class_name = name.to_s.camelcase.singularize if @class_name.nil?
 
   end
 end
 
 class HasManyOptions < AssocOptions
   def initialize(name, self_class_name, options = {})
-    if options.empty?
-      @foreign_key = "#{self_class_name.downcase}_id".to_sym
-      @primary_key = :id
-      @class_name = name.camelcase.singularize
-    else
-      @foreign_key = options[:foreign_key]
-      @primary_key = options[:primary_key]
-      @class_name = options[:class_name]
-    end
+    @foreign_key = options[:foreign_key]
+    @primary_key = options[:primary_key]
+    @class_name = options[:class_name]
+
+    @foreign_key = "#{self_class_name.to_s.downcase.singularize}_id".to_sym if @foreign_key.nil?
+    @primary_key = :id if @primary_key.nil?
+    @class_name = name.to_s.camelcase.singularize if @class_name.nil?
   end
 end
 
 module Associatable
   # Phase IIIb
   def belongs_to(name, options = {})
-    belongs_to_options = BelongsToOptions.new(name.to_s, options)
-    byebug
-    foreign_key = belongs_to_options.send(:foreign_key)
-    model_class = belongs_to_options.send(:model_class)
-    model_class.where(primary_key: foreign_key)
-    # define_method(name) do
-    #   foreign_key = options.send(:foreign_key)
-    #   model_class = options.send(:model_class)
-    #   model_class.where(primary_key: foreign_key)
-    # end
+    belongs_to_options = BelongsToOptions.new(name, options)
+
+    define_method(name) do
+      foreign_key = send(belongs_to_options.foreign_key)
+      belongs_to_options.model_class.where(belongs_to_options.primary_key => foreign_key).first
+    end
+
+    assoc_options[name] = belongs_to_options
   end
 
   def has_many(name, options = {})
-    # ...
+    has_many_options = HasManyOptions.new(name, self, options)
+
+    define_method(name) do
+      primary_key = send(has_many_options.primary_key)
+      has_many_options.model_class.where(has_many_options.foreign_key => primary_key)
+    end
+
+    assoc_options[name] = has_many_options
   end
 
   def assoc_options
-    # Wait to implement this in Phase IVa. Modify `belongs_to`, too.
+    @assoc_options ||= {}
   end
 end
 
